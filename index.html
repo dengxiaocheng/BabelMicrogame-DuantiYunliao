@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>断梯运料</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #e0e0e0; font-family: monospace; }
+    #game-root {
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 1.5rem;
+    }
+    h2 { color: #e8d44d; margin-bottom: 1rem; }
+    pre {
+      background: #16213e;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .hint {
+      color: #666;
+      font-size: 0.8rem;
+      margin-top: 1rem;
+    }
+    code { color: #e8d44d; }
+  </style>
+</head>
+<body>
+  <div id="game-root">
+    <h2>断梯运料</h2>
+    <p>加载中…</p>
+    <p class="hint">此为最小骨架，需要构建步骤编译 TypeScript。</p>
+  </div>
+
+  <!--
+    构建后由 src/main.ts 编译产物替换以下占位。
+    当前为静态占位，验证 HTML 可加载。
+
+    完整构建流程（由 integration worker 接入）：
+      1. 安装依赖：npm install
+      2. 编译：npx tsc 或 vite build
+      3. 产物引用：<script type="module" src="./dist/main.js"></script>
+  -->
+  <script>
+    // 骨架占位：展示游戏基本信息
+    window.addEventListener('DOMContentLoaded', function() {
+      var root = document.getElementById('game-root');
+      if (!root) return;
+      root.innerHTML =
+        '<h2>断梯运料 — Direction Lock 骨架</h2>' +
+        '<pre>' +
+        '核心循环：选择材料组合 → 规划路线 → 移动 → 消耗体力和脚手架耐久 → 到达卸货点或事故发生\n\n' +
+        '五个状态：resource / pressure / risk / relation / round\n\n' +
+        '四轮节奏：\n' +
+        '  Round 1 — 短路线，教学\n' +
+        '  Round 2 — 破格与加固\n' +
+        '  Round 3 — 多目标运料\n' +
+        '  Round 4 — 限时抢运 + 高风险近路\n' +
+        '</pre>' +
+        '<p class="hint">骨架已就绪。完整交互需构建 TypeScript（由 integration worker 接入）。</p>';
+    });
+  </script>
+</body>
+</html>

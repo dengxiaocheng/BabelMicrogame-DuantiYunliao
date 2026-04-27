@@ -1,0 +1,12 @@
+{
+  "name": "duanti-yunliao",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx/esm --test 'src/game.test.ts'"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}
