@@ -58,6 +58,14 @@ export interface GameState {
   pendingEvent: GameEvent | null;
   /** 上一条反馈文本 */
   message: string;
+
+  /** Direction Lock Required States */
+  /** 体力 (0-20)：每步消耗，负重越大消耗越多 */
+  stamina: number;
+  /** 脚手架整体稳定性 (0-100)：基于格子耐久聚合计算 */
+  scaffoldStability: number;
+  /** 卸货进度 (0-100)：已送达次数 / 目标次数 */
+  deliveryProgress: number;
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -71,6 +79,9 @@ const INITIAL_STATE: Omit<GameState, 'scaffold' | 'grid' | 'pos' | 'load' | 'loa
   relation: 5,
   round: 1,
   phase: 'select_materials',
+  stamina: 20,
+  scaffoldStability: 100,
+  deliveryProgress: 0,
 };
 
 // ── Helpers ────────────────────────────────────────────────
@@ -96,6 +107,21 @@ function isEndpoint(state: GameState): boolean {
   return state.scaffold.endpoints.some(
     ([ex, ey]) => state.pos[0] === ex && state.pos[1] === ey,
   );
+}
+
+/** 从可变格子耐久计算整体稳定性百分比 */
+function computeScaffoldStability(grid: number[][], template: number[][]): number {
+  let current = 0;
+  let original = 0;
+  for (let y = 0; y < template.length; y++) {
+    for (let x = 0; x < template[y].length; x++) {
+      if (template[y][x] > 0) {
+        original += template[y][x];
+        current += Math.max(0, grid[y][x]);
+      }
+    }
+  }
+  return original === 0 ? 0 : Math.round((current / original) * 100);
 }
 
 // ── Game Engine ────────────────────────────────────────────
@@ -128,6 +154,9 @@ export function startRound(state: GameState, round: number): void {
   state.scaffold = scaffold;
   state.grid = deepCopyGrid(scaffold.grid);
   state.pos = [...scaffold.start] as [number, number];
+  state.stamina = 20;
+  state.scaffoldStability = 100;
+  state.deliveryProgress = 0;
   state.turn = 0;
   state.deliveries = 0;
   state.load = [];
@@ -188,7 +217,11 @@ export function moveStep(state: GameState, dx: number, dy: number): GameState {
   state.pos = [nx, ny];
   state.turn++;
 
-  // 消耗体力和脚手架耐久（核心机制）
+  // 消耗体力（核心机制：负重越大消耗越多）
+  const staminaCost = 1 + Math.floor(state.loadWeight / 2);
+  state.stamina = clamp(state.stamina - staminaCost, 0, 20);
+
+  // 消耗脚手架耐久（核心机制）
   const drain = durabilityDrain(state.scaffold, state.loadWeight);
   const stabilityMod = totalStability(state.load);
   const effectiveDrain = Math.max(0, drain - stabilityMod);
@@ -198,10 +231,28 @@ export function moveStep(state: GameState, dx: number, dy: number): GameState {
   const newDur = Math.max(0, cellDur - effectiveDrain);
   state.grid[ny][nx] = newDur;
 
+  // 更新脚手架整体稳定性
+  state.scaffoldStability = computeScaffoldStability(state.grid, state.scaffold.grid);
+
   // 耐久归零 → 格子断裂 → risk 上升
   if (newDur === 0) {
     state.risk += 3;
     state.message = `脚下格子断裂！耐久耗尽。risk 上升。`;
+  }
+
+  // 状态耦合：体力过低 → 坠落风险增加（生存压力 → 风险压力）
+  if (state.stamina <= 3 && state.stamina >= 0) {
+    state.risk = clamp(state.risk + 1, 0, 20);
+  }
+
+  // 状态耦合：脚手架稳定性过低 → 坠落风险增加（秩序压力 → 风险压力）
+  if (state.scaffoldStability < 30) {
+    state.risk = clamp(state.risk + 1, 0, 20);
+  }
+
+  // 体力耗尽警告
+  if (state.stamina === 0) {
+    state.message += ' 体力耗尽！每一步都摇摇欲坠。';
   }
 
   // 负重增加 pressure（每 3 点负重 +1 pressure/回合）
@@ -214,6 +265,10 @@ export function moveStep(state: GameState, dx: number, dy: number): GameState {
   if (isEndpoint(state)) {
     state.phase = 'arrived';
     state.deliveries++;
+
+    // 更新卸货进度
+    const targetDeliveries = state.scaffold.endpoints.length;
+    state.deliveryProgress = Math.round((state.deliveries / targetDeliveries) * 100);
 
     // 到达结算：材料 value → resource
     const deliveredValue = state.load.reduce((sum, id) => {
@@ -330,6 +385,31 @@ export function nextRound(state: GameState): GameState {
 
 // ── Phase: resolve（通用状态结算） ─────────────────────────
 
+export interface CycleResolution {
+  /** 本轮是否完全送达所有卸货点 */
+  success: boolean;
+  deliveryProgress: number;
+  staminaRemaining: number;
+  scaffoldIntegrity: number;
+  fallRisk: number;
+  summary: string;
+}
+
+/** 一次循环结算：基于当前五个 Required State 判定结算结果 */
+export function resolveCycle(state: GameState): CycleResolution {
+  const success = state.deliveryProgress >= 100;
+  return {
+    success,
+    deliveryProgress: state.deliveryProgress,
+    staminaRemaining: state.stamina,
+    scaffoldIntegrity: state.scaffoldStability,
+    fallRisk: state.risk,
+    summary: success
+      ? `卸货完成！进度 ${state.deliveryProgress}%，体力剩余 ${state.stamina}，架体稳定 ${state.scaffoldStability}%，风险 ${state.risk}`
+      : `当前进度 ${state.deliveryProgress}%，体力剩余 ${state.stamina}，架体稳定 ${state.scaffoldStability}%，风险 ${state.risk}`,
+  };
+}
+
 export function resolveAccident(state: GameState): GameState {
   if (state.phase !== 'accident') return state;
   // 事故后直接进入轮次结算
@@ -350,6 +430,9 @@ export function getGameSummary(state: GameState): string {
     `压力: ${state.pressure}`,
     `风险: ${state.risk}`,
     `关系: ${state.relation}`,
+    `体力: ${state.stamina}`,
+    `架体稳定: ${state.scaffoldStability}%`,
+    `卸货进度: ${state.deliveryProgress}%`,
     `负重: ${state.loadWeight}`,
     `位置: (${state.pos[0]}, ${state.pos[1]})`,
     `回合: ${state.turn}`,

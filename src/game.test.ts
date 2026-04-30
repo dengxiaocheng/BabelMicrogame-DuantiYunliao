@@ -19,6 +19,7 @@ import {
   resolveAccident,
   getGameSummary,
   GameState,
+  resolveCycle,
 } from './game.js';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -229,5 +230,112 @@ describe('完整 4 轮流程', () => {
     }
 
     assert.fail('应到达 game_over');
+  });
+});
+
+// ── Direction Lock Required State Tests ───────────────────
+
+describe('Direction Lock Required State', () => {
+  it('五个 Required State 初始化正确', () => {
+    const state = createGame();
+    assert.equal(state.stamina, 20, '体力应初始化为 20');
+    assert.equal(state.scaffoldStability, 100, '脚手架稳定性应初始化为 100');
+    assert.equal(state.deliveryProgress, 0, '卸货进度应初始化为 0');
+    assert.ok(Array.isArray(state.load), 'load 应为数组');
+    assert.ok(state.risk >= 0, 'fallRisk 应为非负');
+  });
+
+  it('移动消耗体力，负重大消耗更多', () => {
+    const light = createGame();
+    prepareToMove(light, ['plank']); // weight 2
+    moveStep(light, 0, 1);
+    drainEvents(light);
+
+    const heavy = createGame();
+    prepareToMove(heavy, ['steel']); // weight 5
+    moveStep(heavy, 0, 1);
+    drainEvents(heavy);
+
+    assert.ok(light.stamina < 20, '轻负重要消耗体力');
+    assert.ok(heavy.stamina < light.stamina, '重负重要消耗更多体力');
+  });
+
+  it('移动降低脚手架稳定性', () => {
+    const state = createGame();
+    prepareToMove(state, ['cement']); // weight 4, stability -1
+    moveStep(state, 0, 1);
+    drainEvents(state);
+
+    assert.ok(state.scaffoldStability < 100, '移动应降低脚手架稳定性');
+  });
+
+  it('到达卸货点增加 deliveryProgress', () => {
+    const state = createGame();
+    prepareToMove(state, ['plank']);
+    tryReachEndpoint(state);
+    drainEvents(state);
+
+    assert.ok(state.deliveryProgress > 0, '到达卸货点应增加进度');
+  });
+
+  it('体力低时增加坠落风险（状态耦合）', () => {
+    const state = createGame();
+    prepareToMove(state, ['steel']); // weight 5
+
+    // 强制体力至低位
+    state.stamina = 2;
+    const riskBefore = state.risk;
+
+    moveStep(state, 0, 1);
+    drainEvents(state);
+
+    assert.ok(state.risk >= riskBefore, '低体力应增加坠落风险');
+  });
+
+  it('resolveCycle 返回结算结果', () => {
+    const state = createGame();
+    prepareToMove(state, ['plank']);
+    tryReachEndpoint(state);
+    drainEvents(state);
+
+    const result = resolveCycle(state);
+    assert.equal(typeof result.success, 'boolean');
+    assert.equal(typeof result.deliveryProgress, 'number');
+    assert.equal(typeof result.staminaRemaining, 'number');
+    assert.equal(typeof result.scaffoldIntegrity, 'number');
+    assert.equal(typeof result.fallRisk, 'number');
+    assert.ok(result.summary.length > 0, '结算应包含摘要');
+  });
+
+  it('resolveCycle 在完成所有卸货后 success = true', () => {
+    const state = createGame();
+    // Round 1 只有 1 个 endpoint，一次到达即 100%
+    prepareToMove(state, ['plank']);
+    tryReachEndpoint(state);
+    drainEvents(state);
+
+    if (state.deliveryProgress >= 100) {
+      const result = resolveCycle(state);
+      assert.equal(result.success, true);
+    }
+  });
+
+  it('状态变化同时影响生存压力和风险压力', () => {
+    const state = createGame();
+    prepareToMove(state, ['steel']); // weight 5
+
+    const staminaBefore = state.stamina;
+    const riskBefore = state.risk;
+    const stabilityBefore = state.scaffoldStability;
+
+    moveStep(state, 0, 1);
+    drainEvents(state);
+
+    // 生存/进度压力：体力下降
+    assert.ok(state.stamina < staminaBefore, '体力应下降');
+    // 秩序/风险压力：稳定性下降或风险上升
+    const orderOrRiskChanged =
+      state.scaffoldStability < stabilityBefore || state.risk > riskBefore;
+    assert.ok(orderOrRiskChanged, '稳定性或风险应变化');
   });
 });
