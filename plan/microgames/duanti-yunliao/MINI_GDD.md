@@ -13,11 +13,11 @@
 
 ## State
 
-- resource
-- pressure
-- risk
-- relation
-- round
+- load
+- stamina
+- scaffold_stability
+- fall_risk
+- delivery_progress
 
 ## UI
 

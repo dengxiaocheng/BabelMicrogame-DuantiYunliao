@@ -1,7 +1,7 @@
 # ACCEPTANCE_PLAYTHROUGH: 断梯运料
 
 ## Scripted Playthrough
-1. 开局显示 resource / pressure / risk / relation / round
+1. 开局显示 load / stamina / scaffold_stability / fall_risk / delivery_progress
 2. 玩家执行一次核心操作：选择材料组合 -> 规划路线 -> 移动 -> 消耗体力和脚手架耐久 -> 到达卸货点或事故发生
 3. 系统必须反馈一个资源或身体压力变化
 4. 系统必须反馈一个关系或风险变化
