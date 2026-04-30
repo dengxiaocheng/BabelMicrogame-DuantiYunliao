@@ -339,3 +339,59 @@ describe('Direction Lock Required State', () => {
     assert.ok(orderOrRiskChanged, '稳定性或风险应变化');
   });
 });
+
+// ── QA 验收补充：自然失败路径 + primary input 完整追踪 ─────
+
+describe('QA 验收补充', () => {
+  it('回合超限自然触发事故（非手动设置 phase）', () => {
+    const state = createGame();
+    prepareToMove(state, ['brick']);
+
+    // 把回合推到上限-1，下一步自然触发超时
+    state.turn = state.scaffold!.turnLimit - 1;
+    moveStep(state, 0, 1);
+
+    assert.equal(state.phase, 'accident', '超时应自然进入事故阶段');
+    assert.ok(state.risk > 0, '事故应增加风险');
+
+    // 事故处理 → 轮次结算
+    resolveAccident(state);
+    assert.equal(state.phase, 'round_end', '事故后应进入轮次结算');
+    assert.ok(state.cycleResult !== null, '应有结算结果');
+  });
+
+  it('primary input 完整追踪：选材→移动→多项 Required State 变化', () => {
+    const state = createGame();
+
+    // 快照初始 Required State
+    const snap = {
+      stamina: state.stamina,
+      scaffoldStability: state.scaffoldStability,
+      risk: state.risk,
+      deliveryProgress: state.deliveryProgress,
+      loadWeight: state.loadWeight,
+    };
+
+    // primary input：选择重负材料 + 在格子上移动
+    selectMaterials(state, ['steel', 'cement']); // weight 9
+    drainEvents(state);
+    if (state.phase === 'plan_route') confirmRoute(state);
+
+    assert.equal(state.loadWeight, 9, '选材应设置负重');
+
+    // 多步移动让状态充分变化
+    for (let i = 0; i < 3; i++) {
+      moveStep(state, 0, 1);
+      drainEvents(state);
+      if (state.phase !== 'move') break;
+    }
+
+    // 验证 primary input 直接驱动了 Required State 变化（不是 choice-only）
+    assert.ok(state.stamina < snap.stamina,
+      '体力应因负重移动下降');
+    assert.ok(state.scaffoldStability < snap.scaffoldStability,
+      '脚手架稳定性应因踩踏下降');
+    assert.ok(state.risk >= snap.risk,
+      '坠落风险应因重负踩踏而上升');
+  });
+});
