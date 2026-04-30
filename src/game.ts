@@ -59,6 +59,9 @@ export interface GameState {
   /** 上一条反馈文本 */
   message: string;
 
+  /** 最近一次轮次结算结果（null = 尚未结算） */
+  cycleResult: CycleResolution | null;
+
   /** Direction Lock Required States */
   /** 体力 (0-20)：每步消耗，负重越大消耗越多 */
   stamina: number;
@@ -72,7 +75,7 @@ export interface GameState {
 
 const MAX_ROUNDS = 4;
 const RISK_COLLAPSE_THRESHOLD = 10;
-const INITIAL_STATE: Omit<GameState, 'scaffold' | 'grid' | 'pos' | 'load' | 'loadWeight' | 'turn' | 'deliveries' | 'pendingEvent' | 'message'> = {
+const INITIAL_STATE: Omit<GameState, 'scaffold' | 'grid' | 'pos' | 'load' | 'loadWeight' | 'turn' | 'deliveries' | 'pendingEvent' | 'message' | 'cycleResult'> = {
   resource: 10,
   pressure: 0,
   risk: 0,
@@ -138,6 +141,7 @@ export function createGame(): GameState {
     deliveries: 0,
     pendingEvent: null,
     message: '选择你的材料组合，准备出发。',
+    cycleResult: null,
   };
   startRound(state, 1);
   return state;
@@ -163,6 +167,7 @@ export function startRound(state: GameState, round: number): void {
   state.loadWeight = 0;
   state.phase = 'select_materials';
   state.pendingEvent = null;
+  state.cycleResult = null;
   state.message = `第 ${round} 轮：${scaffold.name} — ${scaffold.description}`;
 }
 
@@ -365,12 +370,13 @@ export function continueAfterDelivery(state: GameState): GameState {
 }
 
 export function endRound(state: GameState): GameState {
+  state.cycleResult = resolveCycle(state);
   state.phase = 'round_end';
-  state.message = `第 ${state.round} 轮结束。资源: ${state.resource}, 关系: ${state.relation}`;
+  state.message = `第 ${state.round} 轮结束。${state.cycleResult.summary}`;
 
   if (state.round >= MAX_ROUNDS) {
     state.phase = 'game_over';
-    state.message = `游戏结束！最终资源: ${state.resource}`;
+    state.message = `游戏结束！${state.cycleResult.summary}`;
     return state;
   }
 

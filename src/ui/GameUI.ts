@@ -247,7 +247,16 @@ export class GameUI {
     if (s.phase === 'round_end') return wrap(`
       <div style="text-align:center;">
         <div style="font-size:16px;color:#e8d44d;font-weight:bold;margin-bottom:8px;">
-          第${s.round}轮结束 — 资源:${s.resource} 关系:${s.relation}</div>
+          第${s.round}轮结算</div>
+        ${s.cycleResult ? `
+        <div style="text-align:left;font-size:13px;margin-bottom:10px;padding:8px;background:#0a0a12;border-radius:4px;">
+          <div>卸货进度: <b style="color:${s.cycleResult.success ? '#4a8d2a' : '#d03030'};">${s.cycleResult.deliveryProgress}%</b></div>
+          <div>体力剩余: ${s.cycleResult.staminaRemaining}</div>
+          <div>架体稳定: ${s.cycleResult.scaffoldIntegrity}%</div>
+          <div>坠落风险: ${s.cycleResult.fallRisk}</div>
+          <div style="margin-top:4px;color:#aaa;font-size:12px;">${s.cycleResult.summary}</div>
+        </div>` : ''}
+        <div style="font-size:13px;color:#888;margin-bottom:8px;">资源:${s.resource} 关系:${s.relation}</div>
         ${s.round >= 4 ? '<div style="color:#888;">所有轮次已完成。</div>'
           : `<button data-a="nextRound" style="padding:8px 24px;background:#e8d44d;color:#111;
               border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:14px;">
@@ -256,6 +265,14 @@ export class GameUI {
     if (s.phase === 'game_over') return wrap(`
       <div style="text-align:center;">
         <div style="font-size:20px;color:#e8d44d;font-weight:bold;margin-bottom:8px;">游戏结束</div>
+        ${s.cycleResult ? `
+        <div style="text-align:left;font-size:13px;margin-bottom:10px;padding:8px;background:#0a0a12;border-radius:4px;">
+          <div>最终结果: <b style="color:${s.cycleResult.success ? '#4a8d2a' : '#d03030'};">${s.cycleResult.success ? '卸货完成' : '未完成'}</b></div>
+          <div>卸货进度: ${s.cycleResult.deliveryProgress}%</div>
+          <div>体力剩余: ${s.cycleResult.staminaRemaining}</div>
+          <div>架体稳定: ${s.cycleResult.scaffoldIntegrity}%</div>
+          <div>坠落风险: ${s.cycleResult.fallRisk}</div>
+        </div>` : ''}
         <div style="font-size:14px;margin-bottom:12px;">最终资源: ${s.resource}</div>
         <button data-a="restart" style="padding:8px 24px;background:#e8d44d;color:#111;
           border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:14px;">
